@@ -46,6 +46,37 @@ pub async fn login_handler(
     }
 }
 
+pub async fn edit_user_handler(
+    headers: HeaderMap,
+    State(app_state): State<Arc<AppState>>,
+    Json(body): Json<CreateUserSchema>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    match app_state
+        .db
+        .edit(&headers, &body)
+        .await
+        .map_err(MyError::from)
+    {
+        Ok(res) => Ok(Json(res)),
+        Err(e) => Err(e.into()),
+    }
+}
+
+pub async fn delete_user_handler(
+    headers: HeaderMap,
+    State(app_state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    match app_state
+        .db
+        .remove(&headers)
+        .await
+        .map_err(MyError::from)
+    {
+        Ok(res) => Ok(Json(res)),
+        Err(e) => Err(e.into()),
+    }
+}
+
 pub async fn connected_handler(
     headers: HeaderMap,
     State(app_state): State<Arc<AppState>>,

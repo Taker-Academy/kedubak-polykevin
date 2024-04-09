@@ -17,6 +17,15 @@ pub struct UserResponse {
     pub lastName: String,
 }
 
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UserResponseDel {
+    pub email: String,
+    pub firstName: String,
+    pub lastName: String,
+    pub removed: bool,
+}
+
 #[derive(Serialize, Debug)]
 pub struct UserData {
     pub token: String,
@@ -57,6 +66,12 @@ pub struct SinglePostResponse {
 pub struct SingleUserResponseGet {
     pub ok: bool,
     pub data: UserResponse,
+}
+
+#[derive(Serialize, Debug)]
+pub struct SingleUserResponseDel {
+    pub ok: bool,
+    pub data: UserResponseDel,
 }
 
 #[derive(Serialize, Debug)]

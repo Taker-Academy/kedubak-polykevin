@@ -2,7 +2,8 @@ use crate::error::MyError;
 use crate::response::{
     GenericResponse, UserData, UserListResponse,
     UserResponse, SingleUserResponse, SingleUserResponseGet,
-    SinglePostResponse, PostData, SinglePostResponseGet
+    SinglePostResponse, PostData, SinglePostResponseGet,
+    SingleUserResponseDel, UserResponseDel,
 };
 use crate::{
     error::MyError::*, model::{UserModel, PostModel, Claims, Comments},
@@ -366,6 +367,102 @@ impl DB {
                 ok: true,
                 data: post_list,
             })
+    }
+
+    pub async fn remove(&self, headers: &HeaderMap)
+        -> Result<SingleUserResponseDel> {
+            let authorization_header = match headers.get("Authorization") {
+                Some(value) => value,
+                None => return Err(JwtNotFoundError("".to_string())),
+            };
+            let header_str = match authorization_header.to_str() {
+                Ok(value) => value,
+                Err(_) => return Err(JwtNotFoundError("".to_string())),
+            };
+            let jwt = header_str.trim_start_matches("Bearer ");
+            let obj_id = match self.id_from_jwt(jwt.to_string()) {
+                Some(value) => value,
+                None => return Err(JwtNotFoundError("".to_string())),
+            };
+            let filter = doc! {"_id": obj_id };
+
+            let user_doc = match self
+                .user_collection
+                .find_one(doc! {"_id": obj_id}, None)
+                .await
+                {
+                    Ok(Some(doc)) => doc,
+                    Ok(None) => return Err(NotFoundError(obj_id.to_string())),
+                    Err(e) => return Err(MongoQueryError(e)),
+                };
+            let result = self
+                .user_collection
+                .delete_one(filter, None)
+                .await
+                .map_err(MongoQueryError)?;
+
+            match result.deleted_count {
+                0 => Err(NotFoundError(obj_id.to_string())),
+                _ => Ok((SingleUserResponseDel {
+                    ok: true,
+                    data: UserResponseDel {
+                        email: user_doc.email,
+                        firstName: user_doc.firstName,
+                        lastName: user_doc.lastName,
+                        removed: true,
+                    }
+                })),
+            }
+    }
+
+    pub async fn edit(&self, headers: &HeaderMap, body: &CreateUserSchema)
+        -> Result<SingleUserResponseGet> {
+            let authorization_header = match headers.get("Authorization") {
+                Some(value) => value,
+                None => return Err(JwtNotFoundError("".to_string())),
+            };
+            let header_str = match authorization_header.to_str() {
+                Ok(value) => value,
+                Err(_) => return Err(JwtNotFoundError("".to_string())),
+            };
+            let jwt = header_str.trim_start_matches("Bearer ");
+            let obj_id = match self.id_from_jwt(jwt.to_string()) {
+                Some(value) => value,
+                None => return Err(JwtNotFoundError("".to_string())),
+            };
+
+            let new_user = CreateUserSchema {
+                email: body.email.to_string(),
+                password: self.hash_string(body.password.to_string()),
+                firstName: body.firstName.to_string(),
+                lastName: body.lastName.to_string(),
+            };
+            let update = doc! {
+                "$set": bson::to_document(&new_user).map_err(MongoSerializeBsonError)?,
+            };
+
+            let options = FindOneAndUpdateOptions::builder()
+                .return_document(ReturnDocument::After)
+                .build();
+            if let Some(doc) = self
+                .user_collection
+                    .find_one_and_update(doc! {"_id": obj_id}, update, options)
+                    .await
+                    .map_err(MongoQueryError)?
+                    {
+                        let user = self.doc_to_user(&doc)?;
+                        let user_response = SingleUserResponseGet {
+                            ok: true,
+                            data: UserResponse {
+                                email: user.email,
+                                firstName: user.firstName,
+                                lastName: user.lastName,
+                            },
+                        };
+                        Ok(user_response)
+                    } else {
+                        Err(NotFoundError(obj_id.to_string()))
+                    }
     }
 
     fn id_from_jwt(&self, jwt: String) -> Option<ObjectId> {
