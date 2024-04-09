@@ -1,0 +1,62 @@
+version: '3'
+
+services:
+  backend:
+    restart: always
+    image: backend
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mongodb
+    networks:
+      - front-tier
+      - mongodb_network
+      - back-tier
+    environment:
+      - "MONGO_INITDB_ROOT_USERNAME=${MONGO_DB_USER}"
+      - "MONGO_INITDB_ROOT_PASSWORD=${MONGO_DB_PASSWORD}"
+      - "MONGO_INITDB_DATABASE=${MONGO_DB_DATABASE}"
+      - "DATABASE_URL=${DATABASE_URL}"
+      - "MONGO_DB_DATABASE=${MONGO_DB_DATABASE}"
+      - "MONGODB_USER_COLLECTION=${MONGODB_USER_COLLECTION}"
+      - "MONGODB_POST_COLLECTION=${MONGODB_POST_COLLECTION}"
+  frontend:
+    restart: always
+    image: izimio/kdb-ui:taker-academy-ui-1.0.0
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongodb
+    networks:
+      - front-tier
+      - mongodb_network
+      - back-tier
+    environment:
+      - "MONGO_INITDB_ROOT_USERNAME=${MONGO_DB_USER}"
+      - "MONGO_INITDB_ROOT_PASSWORD=${MONGO_DB_PASSWORD}"
+      - "MONGO_INITDB_DATABASE=${MONGO_DB_DATABASE}"
+  mongodb:
+    restart: always
+    image: mongo:4.0
+    container_name: my-mongodb
+    ports:
+      - "${MONGO_DB_PORT}:${MONGO_DB_PORT}"
+    environment:
+      - "MONGO_INITDB_ROOT_USERNAME=${MONGO_DB_USER}"
+      - "MONGO_INITDB_ROOT_PASSWORD=${MONGO_DB_PASSWORD}"
+      - "MONGO_INITDB_DATABASE=${MONGO_DB_DATABASE}"
+    volumes:
+      - "mongodb_data:/data/db"
+    networks:
+      - mongodb_network
+      - front-tier
+      - back-tier
+
+volumes:
+  mongodb_data:
+
+networks:
+  mongodb_network: {}
+  front-tier: {}
+  back-tier: {}
